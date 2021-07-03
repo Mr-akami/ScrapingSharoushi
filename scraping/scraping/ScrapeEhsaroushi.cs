@@ -8,6 +8,7 @@ using AngleSharp.Html.Parser;
 using System.Threading.Tasks;
 using System.Linq;
 using scraping;
+using AngleSharp.Dom;
 
 namespace scraping
 {
@@ -17,9 +18,34 @@ namespace scraping
         private string url_ = "http://esharoushi.com/";         
 
         /**
-         *  トップページから県の情報を取得し、県別にスクレイピングする関数を呼び出す 
+         * エントリー関数
          */
         public override async Task Scrape()
+        {
+            // 都道府県取得
+            IHtmlCollection<IElement> prefs = GetPrefectures().Result;
+
+            var pref = prefs.Select(x =>
+            {
+                return x.GetAttribute("href");
+            });
+
+            // 都道府県別にスクレイピングする
+            foreach (var item in pref.Select((v, i) => new { item = v, index = i }))
+            {
+                if (46 < item.index) break; // 先頭から47県を実施
+                Console.WriteLine(url_ + item.item);
+                DataStore data_registry = new();  // データを格納するオブジェクト生成
+                ScrapeChilePage(url_ + item.item, data_registry).Wait();    // 県別にスクレイピングする
+                data_registry.OutputData(item.item.Replace("/", ""));    // 取得したデータを県別に出力。取得したhrehに/があるので削除
+            }
+        }
+
+
+        /**
+         *  トップページから県の情報を取得する関数
+         */
+        public async Task<AngleSharp.Dom.IHtmlCollection<AngleSharp.Dom.IElement>> GetPrefectures()
         {
             var client = new HttpClient();
             var res = await client.GetStringAsync(this.url_);
@@ -27,43 +53,30 @@ namespace scraping
             var parser = new HtmlParser();
             var doc = await parser.ParseDocumentAsync(res);
 
-            // 都道県のリストを取得
-            var link = doc.QuerySelectorAll("li.area-table__lists > a").Select(v=> {
-                var data = v.GetAttribute("href");
-                return data ;
-            });
-
-            // 都道県ごとにスクレイピングする
-            foreach (var item in link.Select((v, i) => new { item = v, index = i }))
-            {
-                if (46 < item.index) break; // 先頭から47県を実施
-                Console.WriteLine(url_ + item.item);
-                Key data_registry = new();  // データを格納するオブジェクト生成
-                ScrapeChilePage(url_ + item.item, data_registry).Wait();    // 県別にスクレイピングする
-                data_registry.OutputData(item.item.Replace("/",""));    // 取得したデータを県別に出力。取得したhrehに/があるので削除
-            }
+            return doc.QuerySelectorAll("li.area-table__lists > a");
         }
+
 
         /**
          * 県別にスクレイピングする関数 
          */
-        public async Task ScrapeChilePage(string url,Key data_registry)
+        public async Task ScrapeChilePage(string url,DataStore data_registry)
         {
             var client = new HttpClient();
             var res = await client.GetStringAsync(url);
 
             var parser = new HtmlParser();
             var doc = await parser.ParseDocumentAsync(res);
-            var a = doc.QuerySelector("li > span.currenttext");
+            var a = doc.QuerySelector("li > span.currenttext"); // 現在のページ数を取得
             var v = a.TextContent.Trim();
-            var inactives = doc.QuerySelectorAll("li > a.inactive");
+            var inactives = doc.QuerySelectorAll("li > a.inactive");    // 現在以外のページ数を取得
 
 
             // 社名リンクの詳細ページに遷移
             var article = doc.QuerySelectorAll("article > div > header > h3 > a");
             foreach (var item in article)
             {
-                ScribeContents(item.GetAttribute("href"),data_registry).Wait();
+                ScrapeContents(item.GetAttribute("href"),data_registry).Wait(); // 会社ごとにスクレイピングする
 
             }
 
@@ -80,23 +93,22 @@ namespace scraping
                     else
                     {
                         Console.WriteLine("next page{0}",item.TextContent);
-                        ScrapeChilePage(item.GetAttribute("href"), data_registry).Wait();
+                        ScrapeChilePage(item.GetAttribute("href"), data_registry).Wait();   // 再起
                         break;
                     }
                 }
                 catch
                 {
-                    Console.WriteLine("parse fail");
+                    Console.WriteLine("parse fail");    // if中のStringをintにパースが失敗する。現在以外のページ数を取得したときに、「次へ」などの数値に変換できない値が入ることがあるため
                 }
-
             }
-            // nページ目を探索
-            // タイトルのページに遷移
-            // 遷移先の情報を記録する
-
         }
 
-        public async Task ScribeContents(string url,Key data_registry)
+
+        /**
+         * 画面から情報を取得しデータに格納する
+         */
+        public async Task ScrapeContents(string url,DataStore data_registry)
         {
             var client = new HttpClient();
             var res = await client.GetStringAsync(url);
@@ -104,14 +116,16 @@ namespace scraping
             var parser = new HtmlParser();
             var doc = await parser.ParseDocumentAsync(res);
 
+            // 格納先の配列
             Dictionary<string, string> profile_info = new() { 
-                { Key.workname, "None"},
-                { Key.address,"None"},
-                { Key.name,"None"},
-                { Key.tell,"None"}
+                { DataStore.kWorkname, "None"},
+                { DataStore.kAddress,"None"},
+                { DataStore.kName,"None"},
+                { DataStore.kTell,"None"}
             };
+
             //事業所名取得
-            profile_info[Key.workname] = doc.QuerySelector("h2.basic_info").TextContent.Trim();
+            profile_info[DataStore.kWorkname] = doc.QuerySelector("h2.basic_info").TextContent.Trim();
 
             // 担当者名取得
             // 住所取得
@@ -120,18 +134,17 @@ namespace scraping
             {
                 if(item.item.TextContent.Trim().Contains("住所"))
                 {
-                    profile_info[Key.address] = doc.QuerySelectorAll("dd.profile-value")[0].TextContent.Trim();
+                    profile_info[DataStore.kAddress] = doc.QuerySelectorAll("dd.profile-value")[0].TextContent.Trim();
                 }
                 if(item.item.TextContent.Trim().Contains("担当"))
                 {
-                    profile_info[Key.name] = doc.QuerySelectorAll("dd.profile-value")[item.index].TextContent.Trim();
+                    profile_info[DataStore.kName] = doc.QuerySelectorAll("dd.profile-value")[item.index].TextContent.Trim();
                 }
                 if(item.item.TextContent.Trim().Contains("TEL"))
                 {
-                    profile_info[Key.tell] = doc.QuerySelector("span#tel-confirm").TextContent.Trim();
+                    profile_info[DataStore.kTell] = doc.QuerySelector("span#tel-confirm").TextContent.Trim();
                 }
             }
-
             // データ蓄積
             data_registry.AddData(profile_info);
 
