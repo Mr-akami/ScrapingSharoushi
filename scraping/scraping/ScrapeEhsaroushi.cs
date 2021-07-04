@@ -31,14 +31,25 @@ namespace scraping
             });
 
             // 都道府県別にスクレイピングする
+            DataStore data_registry = new();  // データを格納するオブジェクト生成
             foreach (var item in pref.Select((v, i) => new { item = v, index = i }))
             {
                 if (46 < item.index) break; // 先頭から47県を実施
+                Dictionary<string, string> pref_name = new()
+                {
+                    { DataStore.kWorkname, item.item.Replace("/","") },
+                    { DataStore.kAddress, "" },
+                    { DataStore.kName, "" },
+                    { DataStore.kTell, "" },
+                    { DataStore.kFax,""}
+                };
+                data_registry.AddData(pref_name);
+
                 Console.WriteLine(url_ + item.item);
-                DataStore data_registry = new();  // データを格納するオブジェクト生成
                 ScrapeChilePage(url_ + item.item, data_registry).Wait();    // 県別にスクレイピングする
-                data_registry.OutputData(item.item.Replace("/", ""));    // 取得したデータを県別に出力。取得したhrehに/があるので削除
+
             }
+            data_registry.OutputData("全都道府県データ.csv");    // 取得したデータを県別に出力。取得したhrehに/があるので削除
         }
 
 
@@ -121,11 +132,13 @@ namespace scraping
                 { DataStore.kWorkname, "None"},
                 { DataStore.kAddress,"None"},
                 { DataStore.kName,"None"},
-                { DataStore.kTell,"None"}
+                { DataStore.kTell,"None"},
+                { DataStore.kFax,"None"}
             };
 
             //事業所名取得
-            profile_info[DataStore.kWorkname] = doc.QuerySelector("h2.basic_info").TextContent.Trim();
+            profile_info[DataStore.kWorkname] = doc.QuerySelector("h2.basic_info").TextContent.Trim().Replace("の紹介","").Replace("の住所","");
+            //profile_info[DataStore.kWorkname] = doc.QuerySelector("h1.single-title").TextContent.Trim().Replace("\r\n", "\n").Split(new[] { '\n', '\r' })[0];
 
             // 担当者名取得
             // 住所取得
@@ -134,7 +147,7 @@ namespace scraping
             {
                 if(item.item.TextContent.Trim().Contains("住所"))
                 {
-                    profile_info[DataStore.kAddress] = doc.QuerySelectorAll("dd.profile-value")[0].TextContent.Trim();
+                    profile_info[DataStore.kAddress] = doc.QuerySelectorAll("dd.profile-value")[0].TextContent.Split('（')[0];
                 }
                 if(item.item.TextContent.Trim().Contains("担当"))
                 {
@@ -144,7 +157,41 @@ namespace scraping
                 {
                     profile_info[DataStore.kTell] = doc.QuerySelector("span#tel-confirm").TextContent.Trim();
                 }
+                if (item.item.TextContent.Trim().Contains("FAX"))
+                {
+                    profile_info[DataStore.kFax] = doc.QuerySelectorAll("dd.profile-value")[item.index].TextContent.Trim();
+                }
             }
+
+            // 表形式でないページのための処理
+            try
+            {
+                if ("None" == profile_info[DataStore.kAddress])
+                {
+                    profile_info[DataStore.kAddress] = doc.QuerySelector("div.map-text").TextContent.Replace("−", "-").Split('（')[0].Trim();
+                }
+                //// FAXでなく郵便番号だったのでコメントアウト
+                //if ("None" == profile_info[DataStore.kFax])
+                //{
+                //   profile_info[DataStore.kFax] = doc.QuerySelectorAll("div.postcode > div.item-data")[0].TextContent;
+                //}
+                if ("None" == profile_info[DataStore.kTell])
+                {
+                    try {
+                        profile_info[DataStore.kTell] = doc.QuerySelector("div.tel.client-item > div.item-data").TextContent.Trim();
+                    }
+                    catch(Exception)
+                    {
+                        Console.WriteLine("not table, not tell");
+                    }
+
+                }
+            }
+            catch
+            {
+
+            }
+
             // データ蓄積
             data_registry.AddData(profile_info);
 
