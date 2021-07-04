@@ -32,7 +32,7 @@ namespace scraping
             bool double_flag = false;
             foreach (var item in tmp_all_data)
             {
-                if (item == dict)
+                if (item[kWorkname] == dict[kWorkname])
                 {
                     Console.WriteLine("重複");
                     double_flag = true;
