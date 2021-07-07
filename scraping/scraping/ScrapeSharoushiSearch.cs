@@ -33,7 +33,7 @@ namespace scraping
             // 都道府県別にスクレイピングする
             foreach (var item in pref.Select((v, i) => new { item = v, index = i }))
             {
-            DataStore data_registry = new();  // データを格納するオブジェクト生成
+                DataStore data_registry = new();  // データを格納するオブジェクト生成
                 if (item.index < 86) continue; // 40番目が1県目の北海道
                 if (86 < item.index) continue; // 86番目が最後の県の沖縄
                 Dictionary<string, string> pref_name = new()
@@ -49,7 +49,7 @@ namespace scraping
                 Console.WriteLine(url_ + item.item);
                 await ScrapeChilePage(url_ + item.item, data_registry);    // 県別にスクレイピングする
 
-            data_registry.OutputData("社労士サーチ全都道府県データ.csv");    // 取得したデータを県別に出力。取得したhrehに/があるので削除
+                data_registry.OutputData("社労士サーチ全都道府県データ.csv");    // 取得したデータを県別に出力。取得したhrehに/があるので削除
             }
         }
 
@@ -194,7 +194,7 @@ namespace scraping
 
             // データ蓄積
             data_registry.AddData(profile_info);
-            Console.WriteLine("====事務所::{0}サーチスエンド====", title);
+            Console.WriteLine("====事務所::{0}サーチエンド====", title);
         }
 
     }
