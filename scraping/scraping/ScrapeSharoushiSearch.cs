@@ -23,7 +23,7 @@ namespace scraping
         public override async Task Scrape()
         {
             // 都道府県取得
-            IHtmlCollection<IElement> prefs = GetPrefectures().Result;
+            IHtmlCollection<IElement> prefs = await GetPrefectures();
 
             var pref = prefs.Select(x =>
             {
@@ -31,11 +31,11 @@ namespace scraping
             });
 
             // 都道府県別にスクレイピングする
-            DataStore data_registry = new();  // データを格納するオブジェクト生成
             foreach (var item in pref.Select((v, i) => new { item = v, index = i }))
             {
-                if (item.index < 40) continue; // 40番目が1県目の北海道
-                if (87 < item.index) continue; // 86番目が最後の県の沖縄
+            DataStore data_registry = new();  // データを格納するオブジェクト生成
+                if (item.index < 86) continue; // 40番目が1県目の北海道
+                if (86 < item.index) continue; // 86番目が最後の県の沖縄
                 Dictionary<string, string> pref_name = new()
                 {
                     { DataStore.kWorkname, item.item.Replace("/","").Split("=")[1] },
@@ -47,10 +47,10 @@ namespace scraping
                 data_registry.AddData(pref_name);
 
                 Console.WriteLine(url_ + item.item);
-                ScrapeChilePage(url_ + item.item, data_registry).Wait();    // 県別にスクレイピングする
+                await ScrapeChilePage(url_ + item.item, data_registry);    // 県別にスクレイピングする
 
-            }
             data_registry.OutputData("社労士サーチ全都道府県データ.csv");    // 取得したデータを県別に出力。取得したhrehに/があるので削除
+            }
         }
 
 
@@ -91,7 +91,8 @@ namespace scraping
             {
                 // 会社名をスクレイピング
                 var title =  item.QuerySelector("h2 > a").GetAttribute("title");
-                ScrapeContents(url_ + item.QuerySelector("h2 > a").GetAttribute("href"),data_registry,title).Wait(); // 会社ごとにスクレイピングする
+                Console.WriteLine("{0}::{1}",title, url_+item.QuerySelector("h2 > a").GetAttribute("href"));
+                await ScrapeContents(url_ + item.QuerySelector("h2 > a").GetAttribute("href"),data_registry,title); // 会社ごとにスクレイピングする
 
             }
 
@@ -142,6 +143,7 @@ namespace scraping
 
             //事業所名取得
             profile_info[DataStore.kWorkname] = title;
+            Console.WriteLine("====事務所::{0}サーチスタート====",title);
             //profile_info[DataStore.kWorkname] = doc.QuerySelector("h2.basic_info").TextContent.Trim().Replace("の紹介","").Replace("の住所","");
             //profile_info[DataStore.kWorkname] = doc.QuerySelector("h1.single-title").TextContent.Trim().Replace("\r\n", "\n").Split(new[] { '\n', '\r' })[0];
 
@@ -150,33 +152,49 @@ namespace scraping
 
 
             // 住所取得
+
             var titles = doc.QuerySelectorAll("tbody > tr");
             foreach (var item in titles.Select((v, i) => new { item = v, index = i }))
             {
-                if(item.item.QuerySelector("th").TextContent.Trim().Contains("所在地"))
+                Console.WriteLine("DEBUG::所在地サーチ");
+                try
                 {
-                    profile_info[DataStore.kAddress] = item.item.QuerySelector("td").TextContent.Replace("\r\n", "\n");
+                    if (item.item.QuerySelector("th").TextContent.Trim().Contains("所在地"))
+                    {
+                        Console.WriteLine("DEBUG::所在地値サーチ");
+                        profile_info[DataStore.kAddress] = item.item.QuerySelector("td").TextContent.Replace("\r\n", "\n");
+                    }
+                    //if(item.item.TextContent.Trim().Contains("担当"))
+                    //{
+                    //    profile_info[DataStore.kName] = doc.QuerySelectorAll("dd.profile-value")[item.index].TextContent.Trim();
+                    //}
+                    Console.WriteLine("DEBUG::TELサーチ");
+                    if (item.item.QuerySelector("th").TextContent.Trim().Contains("TEL"))
+                    {
+                        Console.WriteLine("DEBUG::TELL番号サーチ");
+                        profile_info[DataStore.kTell] = item.item.QuerySelector("td").TextContent.Replace("\r\n", "\n").Trim();
+                    }
+                    Console.WriteLine("DEBUG::FAXサーチ");
+                    if (item.item.QuerySelector("th").TextContent.Trim().Contains("FAX"))
+                    {
+                        Console.WriteLine("DEBUG::FAX番号サーチ");
+                        profile_info[DataStore.kFax] = item.item.QuerySelector("td").TextContent.Replace("\r\n", "\n").Trim();
+                    }
                 }
-                //if(item.item.TextContent.Trim().Contains("担当"))
-                //{
-                //    profile_info[DataStore.kName] = doc.QuerySelectorAll("dd.profile-value")[item.index].TextContent.Trim();
-                //}
-                if(item.item.QuerySelector("th").TextContent.Trim().Contains("TEL"))
+                catch
                 {
-                    profile_info[DataStore.kTell] = item.item.QuerySelector("td").TextContent.Trim();
-                }
-                if (item.item.QuerySelector("th").TextContent.Trim().Contains("FAX"))
-                {
-                    profile_info[DataStore.kFax] = item.item.QuerySelector("td").TextContent.Trim();
+                    Console.WriteLine("!!!Table is not found!!!!");
                 }
             }
+            
+
 
             // 表形式でないページのための処理
 
 
             // データ蓄積
             data_registry.AddData(profile_info);
-
+            Console.WriteLine("====事務所::{0}サーチスエンド====", title);
         }
 
     }
