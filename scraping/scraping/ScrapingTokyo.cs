@@ -38,6 +38,13 @@ namespace scraping
             var parser = new HtmlParser();
             var doc = await parser.ParseDocumentAsync(res);
 
+            
+            
+            if(null == doc.QuerySelector("div.search-result-person")) {
+                Console.WriteLine("===End {0}===",current_page_);
+                return;
+            }
+
             // 社名リンクの詳細ページに遷移
             var article = doc.QuerySelectorAll("div.profile-btn > a.profile-open");
 
@@ -45,6 +52,7 @@ namespace scraping
             {
                 // 詳細ボタンがない場合
                 await ScrapeTopContents(doc, data_registry);
+  
             }
 
             foreach (var item in article)
@@ -55,6 +63,7 @@ namespace scraping
             data_registry.OutputData("都道府県別_tokyo.csv");    // 取得したデータを県別に出力。
 
             current_page_++;
+            Console.WriteLine("!!!!!pages={0}!!!!!", current_page_);
             await ScrapeChilePage(url_1_ + current_page_ + url_2_,data_registry);
 
         }
@@ -68,15 +77,7 @@ namespace scraping
             var parser = new HtmlParser();
             var doc = await parser.ParseDocumentAsync(res);
 
-            try
-            {
-                doc.QuerySelector("div.search-result-person");
-            }
-            catch
-            {
-                Console.WriteLine("===End===");
-                return;
-            }
+
 
             // 格納先の配列
             Dictionary<string, string> profile_info = new()
@@ -89,7 +90,7 @@ namespace scraping
             };
 
             //事業所名取得
-            profile_info[DataStore.kWorkname] = doc.QuerySelector("div.individual-caption.col-md-8 > p.color_blue.font-saize_18.bold").TextContent.Trim().Replace("の紹介", "").Replace("の住所", "");
+            profile_info[DataStore.kWorkname] = doc.QuerySelector("div.individual-caption.col-md-8 > p.color_blue.font-saize_18.bold").TextContent.Trim();
             Console.WriteLine("====事務所::{0}サーチスタート====", profile_info[DataStore.kWorkname]);
 
             // 担当者名取得
@@ -101,25 +102,25 @@ namespace scraping
             var titles = doc.QuerySelectorAll("tbody > tr");
             foreach (var item in titles.Select((v, i) => new { item = v, index = i }))
             {
-                Console.WriteLine("DEBUG::所在地サーチ");
+                //Console.WriteLine("DEBUG::所在地サーチ");
                 try
                 {
                     if (item.item.QuerySelector("th").TextContent.Trim().Contains("所在地"))
                     {
-                        Console.WriteLine("DEBUG::所在地値サーチ");
+                        //Console.WriteLine("DEBUG::所在地値サーチ");
                         profile_info[DataStore.kAddress] = item.item.QuerySelector("td").TextContent.Replace("\r\n", "").Trim();
                     }
 
-                    Console.WriteLine("DEBUG::TELサーチ");
+                    //Console.WriteLine("DEBUG::TELサーチ");
                     if (item.item.QuerySelectorAll("th")[0].TextContent.Trim().Contains("TEL"))
                     {
-                        Console.WriteLine("DEBUG::TELL番号サーチ");
+                        //Console.WriteLine("DEBUG::TELL番号サーチ");
                         profile_info[DataStore.kTell] = item.item.QuerySelectorAll("td")[0].TextContent.Replace("\r\n", "\n").Trim();
                     }
-                    Console.WriteLine("DEBUG::FAXサーチ");
+                    //Console.WriteLine("DEBUG::FAXサーチ");
                     if (item.item.QuerySelectorAll("th")[1].TextContent.Trim().Contains("FAX"))
                     {
-                        Console.WriteLine("DEBUG::FAX番号サーチ");
+                        //Console.WriteLine("DEBUG::FAX番号サーチ");
                         profile_info[DataStore.kFax] = item.item.QuerySelectorAll("td")[1].TextContent.Replace("\r\n", "\n").Trim();
                     }
                 }
@@ -140,7 +141,7 @@ namespace scraping
         }
 
 
-        public async Task ScrapeTopContents(IHtmlDocument doc,DataStore data_registry)
+        public async Task ScrapeTopContents(IHtmlDocument doc, DataStore data_registry)
         {
 
             // 格納先の配列
@@ -169,23 +170,25 @@ namespace scraping
 
                 foreach (var table in li)
                 {
-                    Console.WriteLine("DEBUG::所在地サーチ");
+                    //Console.WriteLine("DEBUG::所在地サーチ");
                     if (table.TextContent.Contains("所在地"))
                     {
-                        profile_info[DataStore.kAddress] = table.TextContent.Replace("事務所所在地","");
+                        profile_info[DataStore.kAddress] = table.TextContent.Replace("事務所所在地", "");
                     }
-                    Console.WriteLine("DEBUG::電話番号");
+                    //Console.WriteLine("DEBUG::電話番号");
                     if (table.TextContent.Contains("電話番号"))
                     {
-                        profile_info[DataStore.kTell] = table.TextContent.Replace("電話番号","");
+                        profile_info[DataStore.kTell] = table.TextContent.Replace("電話番号", "");
                     }
 
                 }
+
+                // データ蓄積
+                Dictionary<string, string> tmp_data = new(profile_info);
+                data_registry.AddData(tmp_data);
             }
 
-            // データ蓄積
-            data_registry.AddData(profile_info);
-            Console.WriteLine("====事務所::{0}サーチエンド====", profile_info[DataStore.kWorkname]);
+            Console.WriteLine("====事務所::{0}サーチエンド====",profile_info[DataStore.kWorkname]);
         }
 
     }

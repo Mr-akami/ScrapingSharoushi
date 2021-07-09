@@ -26,7 +26,9 @@ namespace scraping
             if (alldata_.Count == 0)
             {
                 alldata_.Add(dict);
+                return;
             }
+
             List<Dictionary<string, string>> tmp_all_data = new(alldata_);   // 次の一致判定処理のためShallow Copyする
 
             bool double_flag = false;
@@ -62,6 +64,7 @@ namespace scraping
                     sw.WriteLine("{0},{1},{2},{3},{4}", alldata_[i][kWorkname], alldata_[i][kName], alldata_[i][kAddress], alldata_[i][kTell], alldata_[i][kFax]);
                 }
             }
+            alldata_.Clear();
         }
 
     }
