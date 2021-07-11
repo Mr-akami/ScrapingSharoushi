@@ -13,7 +13,8 @@ namespace scraping
             Console.WriteLine("Hello World!");
             //IScraper scraper = new ScrapeEhsaroushi();
             //IScraper scraper = new ScrapeSharoushiSearch();
-            IScraper scraper = new ScrapingTokyo();
+            //IScraper scraper = new ScrapingTokyo();
+            IScraper scraper = new ScrapingSaitama();
             await scraper.Scrape();
         }
     }
