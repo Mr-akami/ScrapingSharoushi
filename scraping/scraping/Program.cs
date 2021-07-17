@@ -14,7 +14,7 @@ namespace scraping
             //IScraper scraper = new ScrapeEhsaroushi();
             //IScraper scraper = new ScrapeSharoushiSearch();
             //IScraper scraper = new ScrapingTokyo();
-            IScraper scraper = new ScrapingTochigi();//new ScrapingIbaraki(); //new ScrapingSaitama();
+            IScraper scraper = new ScrapingGunma();//new ScrapingTochigi();//new ScrapingIbaraki(); //new ScrapingSaitama();
             await scraper.Scrape();
         }
     }
